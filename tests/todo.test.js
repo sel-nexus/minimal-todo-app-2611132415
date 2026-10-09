@@ -35,6 +35,12 @@ function createHarness() {
       this.listeners[type] = listener;
     }
 
+    dispatch(type, event = {}) {
+      const listener = this.listeners[type];
+      assert.ok(listener, `expected a registered ${type} listener`);
+      listener({ preventDefault() {}, ...event });
+    }
+
     setAttribute(name, value) {
       this.attributes[name] = value;
     }
@@ -55,7 +61,8 @@ function createHarness() {
   }
 
   for (const id of ["todo-form", "todo-input", "empty-state", "todo-list"]) {
-    elements.set(id, new Element(id === "todo-list" ? "ul" : "div"));
+    const tagName = id === "todo-list" ? "ul" : id === "todo-form" ? "form" : "div";
+    elements.set(id, new Element(tagName));
   }
 
   const document = {
@@ -92,9 +99,11 @@ test("add trims titles, clears input, and assigns sequential IDs", () => {
   const { context, elements, getTodos } = createHarness();
   const input = elements.get("todo-input");
   input.value = "  Buy milk  ";
-  context.addTodo();
+  let defaultPrevented = false;
+  elements.get("todo-form").dispatch("submit", { preventDefault() { defaultPrevented = true; } });
   input.value = "Walk dog";
-  context.addTodo();
+  elements.get("todo-form").dispatch("submit");
+  assert.equal(defaultPrevented, true);
 
   const todos = getTodos();
   assert.deepEqual(todos, [
@@ -113,9 +122,9 @@ test("empty and whitespace-only input do not create tasks", () => {
   const { context, elements, getTodos } = createHarness();
   const input = elements.get("todo-input");
   input.value = "";
-  context.addTodo();
+  elements.get("todo-form").dispatch("submit");
   input.value = " \t  ";
-  context.addTodo();
+  elements.get("todo-form").dispatch("submit");
 
   assert.equal(getTodos().length, 0);
   assert.equal(elements.get("todo-list").innerHTML, "");
@@ -129,11 +138,15 @@ test("toggle changes only the selected task and renders completion styling", () 
   elements.get("todo-input").value = "Second";
   context.addTodo();
 
-  context.toggleTodo(1);
+  const firstCheckbox = elements.get("todo-list").children[0].children[0];
+  firstCheckbox.checked = true;
+  firstCheckbox.dispatch("change");
   const todos = getTodos();
   assert.deepEqual(todos.map((todo) => todo.completed), [true, false]);
+  assert.equal(elements.get("todo-list").children[0].children[0].checked, true);
   assert.equal(elements.get("todo-list").children[0].children[1].className, "todo-title completed");
-  context.toggleTodo(1);
+  elements.get("todo-list").children[0].children[0].checked = false;
+  elements.get("todo-list").children[0].children[0].dispatch("change");
   assert.equal(getTodos()[0].completed, false);
 });
 
@@ -144,10 +157,10 @@ test("delete removes only the selected task and restores empty state", () => {
   elements.get("todo-input").value = "Second";
   context.addTodo();
 
-  context.deleteTodo(1);
+  elements.get("todo-list").children[0].children[2].dispatch("click");
   assert.deepEqual(getTodos().map((todo) => todo.id), [2]);
   assert.deepEqual(elements.get("todo-list").children.map((item) => item.dataset.testid), ["todo-item-2"]);
-  context.deleteTodo(2);
+  elements.get("todo-list").children[0].children[2].dispatch("click");
   assert.equal(getTodos().length, 0);
   assert.equal(elements.get("empty-state").hidden, false);
   assert.equal(elements.get("todo-list").innerHTML, "");

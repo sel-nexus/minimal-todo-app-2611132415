@@ -1,0 +1,13 @@
+{
+  "name": "vanilla-todo-test-harness",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Test tooling for the standalone Minimal Todo App; not required to run index.html.",
+  "scripts": {
+    "test": "node --test tests/todo.test.js",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.0"
+  }
+}
